@@ -1,0 +1,5 @@
+surya-ocr
+fastapi
+uvicorn
+python-multipart
+pillow
