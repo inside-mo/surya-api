@@ -1,5 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, Header, HTTPException
 from PIL import Image
+import fitz  # PyMuPDF for PDF handling
 from io import BytesIO
 from surya.recognition import RecognitionPredictor
 from surya.detection import DetectionPredictor
@@ -9,13 +10,21 @@ app = FastAPI()
 recognition_predictor = RecognitionPredictor()
 detection_predictor = DetectionPredictor()
 
-API_KEY = os.getenv("API_KEY", "default-key")
+API_KEY = os.getenv("API_KEY", "your-default-key")
 
 @app.post("/ocr")
 async def ocr(file: UploadFile = File(...), x_api_key: str = Header(None)):
     if x_api_key != API_KEY:
-        raise HTTPException(status_code=403, message="Invalid API key")
+        raise HTTPException(status_code=403, detail="Invalid API key")
     
-    image = Image.open(BytesIO(await file.read()))
-    predictions = recognition_predictor([image], det_predictor=detection_predictor)
-    return predictions[0]
+    content = await file.read()
+    pdf = fitz.open(stream=content, filetype="pdf")
+    results = []
+    
+    for page in pdf:
+        pix = page.get_pixmap()
+        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        predictions = recognition_predictor([img], det_predictor=detection_predictor)
+        results.extend(predictions)
+    
+    return {"results": results}
